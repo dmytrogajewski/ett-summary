@@ -1,0 +1,12 @@
+[package]
+name = "client_app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.11", features = ["blocking", "multipart"] }
+hound = "3.5.1"                                                      # Ensure this is the correct version for your needs
+cpal = "0.15.3"
+clap = { version = "4.5.20", features = ["derive"] }
+clap_derive = { version = "4.0.0-rc.1" }
