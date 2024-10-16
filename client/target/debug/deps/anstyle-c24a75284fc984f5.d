@@ -1,0 +1,12 @@
+/home/drwatsno/sources/ett-summary/client/target/debug/deps/libanstyle-c24a75284fc984f5.rmeta: /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/lib.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/macros.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/color.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/effect.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/reset.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/style.rs
+
+/home/drwatsno/sources/ett-summary/client/target/debug/deps/libanstyle-c24a75284fc984f5.rlib: /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/lib.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/macros.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/color.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/effect.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/reset.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/style.rs
+
+/home/drwatsno/sources/ett-summary/client/target/debug/deps/anstyle-c24a75284fc984f5.d: /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/lib.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/macros.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/color.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/effect.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/reset.rs /home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/style.rs
+
+/home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/lib.rs:
+/home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/macros.rs:
+/home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/color.rs:
+/home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/effect.rs:
+/home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/reset.rs:
+/home/drwatsno/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.8/src/style.rs:
