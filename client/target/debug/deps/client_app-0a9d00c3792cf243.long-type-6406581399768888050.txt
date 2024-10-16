@@ -1,1 +1,0 @@
-futures_util::stream::try_stream::MapOk<FramedRead<tokio::fs::file::File, BytesCodec>, {closure@src/main.rs:141:66: 141:73}>
