@@ -10,7 +10,6 @@ use tokio::time::Instant;
 #[derive(Parser, Debug)]
 #[command(version, about = "CPAL record from device", long_about = None)]
 struct Opt {
-    /// The audio device to use
     #[arg(short, long, default_value_t = String::from("default"))]
     device: String,
 }
@@ -18,17 +17,14 @@ struct Opt {
 fn device() -> Result<cpal::Device, Box<dyn std::error::Error>> {
     let opt = Opt::parse();
 
-    // Conditionally compile with jack if the feature is specified.
     #[cfg(all(any(
         target_os = "linux",
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "netbsd"
     )))]
-    // Manually check for flags. Can be passed through cargo with -- e.g.
     let host = cpal::default_host();
 
-    // Set up the input device and stream with the default input config.
     let device = if opt.device == "default" {
         host.default_output_device()
     } else {
@@ -62,7 +58,6 @@ fn capture_audio<
 
     stream.play()?;
 
-    // Keep the stream running
     std::thread::sleep(std::time::Duration::from_secs(3600));
     drop(stream);
     Ok(())
@@ -125,12 +120,9 @@ async fn batch_and_send<
         if buffer.len() >= total_samples_u {
             let timestamp = start_time.elapsed().as_secs();
             let filename = format!("audio_{}.wav", timestamp);
+
             write_wav(&filename, &buffer, spec)?;
-
-            // Send WAV to server
             send_wav(&filename).await?;
-
-            // Clear buffer
             buffer.clear();
         }
     }
@@ -179,7 +171,7 @@ async fn send_wav(filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     let form = reqwest::multipart::Form::new().part("file", part);
 
     let response = client
-        .post("http://your-server-endpoint/upload")
+        .post("http://todo/upload")
         .multipart(form)
         .send()
         .await?;
@@ -190,7 +182,6 @@ async fn send_wav(filename: &str) -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("Failed to send {}: {}", filename, response.status());
     }
 
-    // Optionally delete the file after sending
     tokio::fs::remove_file(filename).await?;
 
     Ok(())
