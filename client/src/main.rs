@@ -215,7 +215,7 @@ async fn send_wav(filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     let form = reqwest::multipart::Form::new().part("file", part);
 
     let response = client
-        .post("http://your-server-endpoint/upload")
+        .post("http://localhost:8000/upload")
         .multipart(form)
         .send()
         .await?;
