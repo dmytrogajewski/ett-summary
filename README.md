@@ -13,14 +13,14 @@ See [`server-rs`](server-rs/) for details about the Rust server and configuratio
 ## Quickstart
 
 1. Install the [Rust toolchain](https://www.rust-lang.org/tools/install).
-2. Copy `server-rs/config.toml` and adjust the API endpoint, model and webhook URL.
+2. Copy `server-rs/config.toml` and adjust the API endpoint, model, database, systems and webhook URL.
 3. Run the server:
    ```bash
    cargo run --release --manifest-path server-rs/Cargo.toml
    ```
-4. Send a WAV file to the running server:
+4. Send a WAV file to the running server (include your `system_key`):
    ```bash
-   curl -F file=@audio.wav http://localhost:8000/upload
+    curl -F file=@audio.wav -F system_key=default http://localhost:8000/upload
    ```
 The server posts an updated summary after each upload and clears it after an hour of inactivity.
 
