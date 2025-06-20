@@ -36,3 +36,27 @@ whisper_model_path = "models/ggml-base.en.bin"
 ```
 
 `webhook_template` is a JSON string where `{summary}` will be replaced with the generated summary before sending the request.
+
+## Pulling the Whisper model
+
+`whisper-rs` expects a `.bin` model file. The default configuration points to
+`models/ggml-base.en.bin`. Download the model once before running the server:
+
+```bash
+mkdir -p server-rs/models
+curl -L -o server-rs/models/ggml-base.en.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+```
+
+## Docker
+
+`server-rs/Dockerfile` builds the server binary and fetches the whisper model at
+image build time. Build and run the image:
+
+```bash
+docker build -t summary-server ./server-rs
+docker run -p 8000:8000 -e OPENAI_API_KEY=your-key summary-server
+```
+
+The container exposes port `8000` and uses `config.toml` from the image. Supply a
+valid `OPENAI_API_KEY` at runtime.
