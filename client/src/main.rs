@@ -27,10 +27,13 @@ struct Opt {
     #[arg(short, long)]
     #[allow(dead_code)]
     jack: bool,
+
+    /// System key to send with uploads
+    #[arg(long)]
+    system_key: String,
 }
 
-fn device() -> Result<cpal::Device, Box<dyn std::error::Error>> {
-    let opt = Opt::parse();
+fn device(opt: &Opt) -> Result<cpal::Device, Box<dyn std::error::Error>> {
 
     // Conditionally compile with jack if the feature is specified.
     #[cfg(all(
@@ -123,7 +126,8 @@ fn capture_thread<T: cpal::SizedSample + hound::Sample + std::marker::Send + 'st
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let d = device().expect("Failed to get device");
+    let opt = Opt::parse();
+    let d = device(&opt).expect("Failed to get device");
     let cfg = d
         .default_input_config()
         .expect("Failed to get default input config");
@@ -134,10 +138,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let strcfg: cpal::StreamConfig = cfg.clone().into();
 
     match cfg.sample_format() {
-        cpal::SampleFormat::I8 => batch_and_send(capture_thread::<i8>(d, strcfg), spec).await?,
-        cpal::SampleFormat::I16 => batch_and_send(capture_thread::<i16>(d, strcfg), spec).await?,
-        cpal::SampleFormat::I32 => batch_and_send(capture_thread::<i32>(d, strcfg), spec).await?,
-        cpal::SampleFormat::F32 => batch_and_send(capture_thread::<f32>(d, strcfg), spec).await?,
+        cpal::SampleFormat::I8 => batch_and_send(capture_thread::<i8>(d, strcfg), spec, &opt.system_key).await?,
+        cpal::SampleFormat::I16 => batch_and_send(capture_thread::<i16>(d, strcfg), spec, &opt.system_key).await?,
+        cpal::SampleFormat::I32 => batch_and_send(capture_thread::<i32>(d, strcfg), spec, &opt.system_key).await?,
+        cpal::SampleFormat::F32 => batch_and_send(capture_thread::<f32>(d, strcfg), spec, &opt.system_key).await?,
         _ => todo!(),
     }
 
@@ -149,6 +153,7 @@ async fn batch_and_send<
 >(
     mut rx: mpsc::Receiver<T>,
     spec: hound::WavSpec,
+    system_key: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let samples_per_second = 44100;
     let channels: usize = 2;
@@ -166,7 +171,7 @@ async fn batch_and_send<
             write_wav(&filename, &buffer, spec)?;
 
             // Send WAV to server
-            send_wav(&filename).await?;
+            send_wav(&filename, system_key).await?;
 
             // Clear buffer
             buffer.clear();
@@ -205,14 +210,16 @@ fn write_wav<T: hound::Sample + Clone>(
     Ok(())
 }
 
-async fn send_wav(filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+async fn send_wav(filename: &str, system_key: &str) -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
     let file = tokio::fs::read(filename).await?;
     let part = reqwest::multipart::Part::bytes(file)
         .file_name(filename.to_string())
         .mime_str("audio/wav")?;
 
-    let form = reqwest::multipart::Form::new().part("file", part);
+    let form = reqwest::multipart::Form::new()
+        .part("file", part)
+        .text("system_key", system_key.to_string());
 
     let response = client
         .post("http://localhost:8000/upload")
@@ -245,5 +252,23 @@ where
                 writer.try_send(sample).ok();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::error::ErrorKind;
+
+    #[test]
+    fn parse_system_key() {
+        let opt = Opt::try_parse_from(["prog", "--system-key", "abc"]).unwrap();
+        assert_eq!(opt.system_key, "abc");
+    }
+
+    #[test]
+    fn missing_system_key_fails() {
+        let err = Opt::try_parse_from(["prog"]).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::MissingRequiredArgument);
     }
 }

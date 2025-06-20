@@ -4,3 +4,47 @@ webhook_url = "https://example.com/webhook"
 # JSON template for the webhook payload; {summary} will be replaced
 webhook_template = '{"summary":"{summary}"}'
 whisper_model_path = "models/ggml-base.en.bin"
+database_url = "postgres://user:password@localhost/summary"
+
+[[systems]]
+key = "default"
+initial_prompt = """
+Summarize this transcription: {transcription}
+
+With this template:
+### 🔴 Incident Summary
+
+**Time:** <START_TIME> – <END_TIME>  
+**Status:** <⚠️ Ongoing / ✅ Resolved / 🕓 Monitoring>  
+**Severity:** <SEV-1 / SEV-2 / SEV-3>  
+**Detected By:** <Monitoring / User Reports / Other>
+
+**Impact:**  
+<Brief description of the impact. Who/what was affected? Include user-facing symptoms, affected services, environments, or regions.>
+
+**Root Cause (Preliminary):**  
+<Short technical description of what caused the incident.>
+
+**Actions Taken:**  
+- <[TIMESTAMP]> <Action #1>  
+- <[TIMESTAMP]> <Action #2>  
+- …
+
+**Next Steps / Preventative Actions:**  
+- [ ] <Fix or mitigation #1>  
+- [ ] <Fix or mitigation #2>  
+- …
+
+**Owner:** <@team-or-person>  
+**Links:**  
+- Dashboard: <link>  
+- Logs: <link>  
+- Incident Tracker: <link>  
+- Postmortem: <link or TBD>
+"""
+update_prompt = """
+Here is text summary:
+{summary}
+Please update this summary with new information from this transcription:
+{transcription}
+"""

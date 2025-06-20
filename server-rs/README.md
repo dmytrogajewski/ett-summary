@@ -5,7 +5,7 @@ This Rust server receives WAV audio files, transcribes them with `whisper-rs` an
 ## Requirements
 - Rust toolchain
 - `OPENAI_API_KEY` environment variable set to a valid OpenAI API key
-- `config.toml` file describing API, webhook and whisper model settings
+- `config.toml` file describing API, webhook, database and whisper model settings
 
 ## Running
 
@@ -15,10 +15,10 @@ cargo run --release --manifest-path server-rs/Cargo.toml
 
 The server listens on `http://localhost:8000` by default.
 
-Send a WAV file to `/upload` using multipart form data:
+Send a WAV file to `/upload` using multipart form data. Include the `system_key` for the target system:
 
 ```bash
-curl -F file=@audio.wav http://localhost:8000/upload
+curl -F file=@audio.wav -F system_key=default http://localhost:8000/upload
 ```
 
 Each uploaded audio file updates the summary which is sent to the configured webhook. If no files are uploaded for an hour, the summary is cleared.
@@ -33,6 +33,12 @@ openai_model = "gpt-3.5-turbo"
 webhook_url = "https://example.com/webhook"
 webhook_template = '{"summary":"{summary}"}'
 whisper_model_path = "models/ggml-base.en.bin"
+database_url = "postgres://user:password@localhost/summary"
+
+[[systems]]
+key = "default"
+initial_prompt = "..."
+update_prompt = "..."
 ```
 
 `webhook_template` is a JSON string where `{summary}` will be replaced with the generated summary before sending the request.

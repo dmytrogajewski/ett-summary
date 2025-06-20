@@ -10,11 +10,20 @@ use serde_json::json;
 use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use tokio_postgres::{Client, NoTls};
+use chrono::{DateTime, Utc};
 use tokio::fs;
 use tokio::sync::Mutex;
 use toml;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+
+#[derive(Clone, Deserialize)]
+struct SystemConfig {
+    key: String,
+    initial_prompt: String,
+    update_prompt: String,
+}
 
 #[derive(Clone, Deserialize)]
 struct Config {
@@ -23,11 +32,11 @@ struct Config {
     webhook_url: String,
     webhook_template: String,
     whisper_model_path: String,
+    database_url: String,
+    systems: Vec<SystemConfig>,
 }
 
 struct SharedState {
-    summary: String,
-    last_received: Instant,
     ctx: WhisperContext,
 }
 
@@ -35,11 +44,7 @@ impl SharedState {
     fn new(model_path: &str) -> Self {
         let ctx = WhisperContext::new_with_params(model_path, WhisperContextParameters::default())
             .expect("failed to load model");
-        Self {
-            summary: String::new(),
-            last_received: Instant::now(),
-            ctx,
-        }
+        Self { ctx }
     }
 }
 
@@ -50,6 +55,7 @@ struct AppState {
     shared: StateHandle,
     config: Arc<Config>,
     key: Arc<String>,
+    db: Arc<Client>,
 }
 
 async fn load_config() -> Config {
@@ -147,12 +153,19 @@ async fn upload_audio(State(app): State<AppState>, mut multipart: Multipart) -> 
     let state = &app.shared;
     let cfg = &app.config;
     let key = &app.key;
+    let db = &app.db;
     let mut data = None;
+    let mut sys_key = None;
     while let Some(field) = multipart.next_field().await.unwrap() {
         if let Some(name) = field.name() {
-            if name == "file" {
-                data = Some(field.bytes().await.unwrap().to_vec());
-                break;
+            match name {
+                "file" => {
+                    data = Some(field.bytes().await.unwrap().to_vec());
+                }
+                "system_key" => {
+                    sys_key = Some(field.text().await.unwrap());
+                }
+                _ => {}
             }
         }
     }
@@ -162,24 +175,57 @@ async fn upload_audio(State(app): State<AppState>, mut multipart: Multipart) -> 
         None => return StatusCode::BAD_REQUEST,
     };
 
+    let system_key = match sys_key {
+        Some(k) => k,
+        None => return StatusCode::BAD_REQUEST,
+    };
+
     let mut s = state.lock().await;
-    s.last_received = Instant::now();
+    if db
+        .execute(
+            "UPDATE state SET last_received = NOW() WHERE system_key=$1",
+            &[&system_key],
+        )
+        .await
+        .is_err()
+    {
+        return StatusCode::INTERNAL_SERVER_ERROR;
+    }
     let transcription = match transcribe_wav(data, &mut s).await {
         Ok(t) => t,
         Err(_) => return StatusCode::BAD_REQUEST,
     };
 
-    let prompt = if s.summary.is_empty() {
-        format!("Summarize this transcription: {}\n\nWith this template:\n### 🔴 Incident Summary\n\n**Time:** <START_TIME> – <END_TIME>  \n**Status:** <⚠️ Ongoing / ✅ Resolved / 🕓 Monitoring>  \n**Severity:** <SEV-1 / SEV-2 / SEV-3>  \n**Detected By:** <Monitoring / User Reports / Other>\n\n**Impact:**  \n<Brief description of the impact. Who/what was affected? Include user-facing symptoms, affected services, environments, or regions.>\n\n**Root Cause (Preliminary):**  \n<Short technical description of what caused the incident.>\n\n**Actions Taken:**  \n- <[TIMESTAMP]> <Action #1>  \n- <[TIMESTAMP]> <Action #2>  \n- …\n\n**Next Steps / Preventative Actions:**  \n- [ ] <Fix or mitigation #1>  \n- [ ] <Fix or mitigation #2>  \n- …\n\n**Owner:** <@team-or-person>  \n**Links:**  \n- Dashboard: <link>  \n- Logs: <link>  \n- Incident Tracker: <link>  \n- Postmortem: <link or TBD>", transcription)
+    drop(s);
+    let row = match db
+        .query_one("SELECT summary FROM state WHERE system_key=$1", &[&system_key])
+        .await
+    {
+        Ok(r) => r,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
+    };
+    let current_summary: String = row.get(0);
+    let sys_cfg = match cfg.systems.iter().find(|s| s.key == system_key) {
+        Some(c) => c,
+        None => return StatusCode::BAD_REQUEST,
+    };
+    let prompt = if current_summary.is_empty() {
+        sys_cfg.initial_prompt.replace("{transcription}", &transcription)
     } else {
-        format!("Here is text summary:\n{}\nPlease update this summary with new infroamtion from this transcription:\n{}", s.summary, transcription)
+        sys_cfg
+            .update_prompt
+            .replace("{summary}", &current_summary)
+            .replace("{transcription}", &transcription)
     };
 
-    drop(s);
-    let mut s = state.lock().await;
     match summarize_text(prompt, &key, &cfg.openai_api_url, &cfg.openai_model).await {
         Ok(sum) => {
-            s.summary = sum.clone();
+            let _ = db
+                .execute(
+                    "UPDATE state SET summary=$1 WHERE system_key=$2",
+                    &[&sum, &system_key],
+                )
+                .await;
             post_webhook(&cfg.webhook_url, &cfg.webhook_template, &sum).await;
             StatusCode::OK
         }
@@ -187,15 +233,27 @@ async fn upload_audio(State(app): State<AppState>, mut multipart: Multipart) -> 
     }
 }
 
-async fn flush_task(state: StateHandle) {
+async fn flush_task(db: Arc<Client>) {
     let mut interval = tokio::time::interval(Duration::from_secs(60));
     loop {
         interval.tick().await;
-        let mut s = state.lock().await;
-        if !s.summary.is_empty()
-            && Instant::now().duration_since(s.last_received) >= Duration::from_secs(3600)
+        if let Ok(rows) = db
+            .query("SELECT system_key, summary, last_received FROM state", &[])
+            .await
         {
-            s.summary.clear();
+            for row in rows {
+                let key: String = row.get(0);
+                let summary: String = row.get(1);
+                let last_received: DateTime<Utc> = row.get(2);
+                if !summary.is_empty()
+                    && Utc::now().signed_duration_since(last_received)
+                        >= chrono::Duration::seconds(3600)
+                {
+                    let _ = db
+                        .execute("UPDATE state SET summary='' WHERE system_key=$1", &[&key])
+                        .await;
+                }
+            }
         }
     }
 }
@@ -204,15 +262,45 @@ async fn flush_task(state: StateHandle) {
 async fn main() {
     let key = Arc::new(env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set"));
     let config = load_config().await;
+    let (client, connection) = tokio_postgres::connect(&config.database_url, NoTls)
+        .await
+        .expect("db connect failed");
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("db connection error: {}", e);
+        }
+    });
+    let db = Arc::new(client);
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS state (
+            system_key TEXT PRIMARY KEY,
+            summary TEXT NOT NULL,
+            last_received TIMESTAMPTZ NOT NULL
+        )",
+        &[],
+    )
+    .await
+    .expect("create table");
+
+    for sys in &config.systems {
+        db.execute(
+            "INSERT INTO state (system_key, summary, last_received) VALUES ($1, '', NOW()) ON CONFLICT (system_key) DO NOTHING",
+            &[&sys.key],
+        )
+        .await
+        .expect("init row");
+    }
+
     let state = Arc::new(Mutex::new(SharedState::new(&config.whisper_model_path)));
 
-    let state_bg = state.clone();
-    tokio::spawn(flush_task(state_bg));
+    let db_bg = db.clone();
+    tokio::spawn(flush_task(db_bg));
 
     let app_state = AppState {
         shared: state.clone(),
         config: Arc::new(config.clone()),
         key: key.clone(),
+        db: db.clone(),
     };
 
     let app = Router::new()
