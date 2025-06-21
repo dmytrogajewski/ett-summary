@@ -41,6 +41,14 @@ initial_prompt = "..."
 update_prompt = "..."
 ```
 
+If you don't have a configuration file, run:
+
+```bash
+cargo run --manifest-path server-rs/Cargo.toml -- gen-config openai > server-rs/config.toml
+```
+
+Change `openai` to one of `openrouter`, `azure`, `ollama` or `local` to use another provider. Remember to supply `OPENAI_API_KEY` when starting the server.
+
 `webhook_template` is a JSON string where `{summary}` will be replaced with the generated summary before sending the request.
 
 ## Pulling the Whisper model

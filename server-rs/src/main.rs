@@ -4,6 +4,7 @@ use axum::{
     routing::post,
     Router,
 };
+use chrono::{DateTime, Utc};
 use hound;
 use serde::Deserialize;
 use serde_json::json;
@@ -11,12 +12,40 @@ use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio_postgres::{Client, NoTls};
-use chrono::{DateTime, Utc};
 use tokio::fs;
 use tokio::sync::Mutex;
+use tokio_postgres::{Client, NoTls};
 use toml;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+
+fn print_config_template(provider: &str) {
+    let url = match provider {
+        "openrouter" => "https://openrouter.ai/api/v1/chat/completions",
+        "azure" => "https://YOUR-RESOURCE.openai.azure.com/openai/deployments/YOUR-DEPLOYMENT/chat/completions?api-version=2023-09-15-preview",
+        "ollama" => "http://localhost:11434/v1/chat/completions",
+        "local" => "http://localhost:8080/v1/chat/completions",
+        _ => "https://api.openai.com/v1/chat/completions",
+    };
+    println!(
+        r#"openai_api_url = "{url}"
+openai_model = "gpt-3.5-turbo"
+webhook_url = "https://example.com/webhook"
+webhook_template = '{{"summary":"{{summary}}"}}'
+whisper_model_path = "models/ggml-base.en.bin"
+database_url = "postgres://user:password@localhost/summary"
+
+[[systems]]
+key = "default"
+initial_prompt = "Summarize this transcription: {{transcription}}"
+
+update_prompt = "Here is text summary:
+{{summary}}
+Please update this summary with new information from this transcription:
+{{transcription}}"
+"#,
+        url = url
+    );
+}
 
 #[derive(Clone, Deserialize)]
 struct SystemConfig {
@@ -198,7 +227,10 @@ async fn upload_audio(State(app): State<AppState>, mut multipart: Multipart) -> 
 
     drop(s);
     let row = match db
-        .query_one("SELECT summary FROM state WHERE system_key=$1", &[&system_key])
+        .query_one(
+            "SELECT summary FROM state WHERE system_key=$1",
+            &[&system_key],
+        )
         .await
     {
         Ok(r) => r,
@@ -210,7 +242,9 @@ async fn upload_audio(State(app): State<AppState>, mut multipart: Multipart) -> 
         None => return StatusCode::BAD_REQUEST,
     };
     let prompt = if current_summary.is_empty() {
-        sys_cfg.initial_prompt.replace("{transcription}", &transcription)
+        sys_cfg
+            .initial_prompt
+            .replace("{transcription}", &transcription)
     } else {
         sys_cfg
             .update_prompt
@@ -260,6 +294,13 @@ async fn flush_task(db: Arc<Client>) {
 
 #[tokio::main]
 async fn main() {
+    let args: Vec<String> = env::args().collect();
+    if args.get(1).map(|s| s == "gen-config").unwrap_or(false) {
+        let provider = args.get(2).map(|s| s.as_str()).unwrap_or("openai");
+        print_config_template(provider);
+        return;
+    }
+
     let key = Arc::new(env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set"));
     let config = load_config().await;
     let (client, connection) = tokio_postgres::connect(&config.database_url, NoTls)
