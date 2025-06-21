@@ -1,0 +1,14 @@
+[Unit]
+Description=ETT Summary Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ett-summary
+Environment=OPENAI_API_KEY=your-key
+Environment=CONFIG_FILE=/opt/ett-summary/server-rs/config.toml
+ExecStart=/opt/ett-summary/bin/server-rs
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
