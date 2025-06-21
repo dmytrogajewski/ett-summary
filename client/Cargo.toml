@@ -10,3 +10,6 @@ hound = "3.5.1"                                                      # Ensure th
 cpal = "0.15.3"
 clap = { version = "4.5.20", features = ["derive"] }
 clap_derive = { version = "4.0.0-rc.1" }
+
+[dev-dependencies]
+tempfile = "3.13.0"

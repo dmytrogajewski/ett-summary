@@ -259,6 +259,8 @@ where
 mod tests {
     use super::*;
     use clap::error::ErrorKind;
+    use tempfile::NamedTempFile;
+    use hound::{WavReader, WavSpec};
 
     #[test]
     fn parse_system_key() {
@@ -270,5 +272,44 @@ mod tests {
     fn missing_system_key_fails() {
         let err = Opt::try_parse_from(["prog"]).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::MissingRequiredArgument);
+    }
+
+    #[test]
+    fn sample_format_int_float() {
+        assert_eq!(sample_format(cpal::SampleFormat::F32), hound::SampleFormat::Float);
+        assert_eq!(sample_format(cpal::SampleFormat::I16), hound::SampleFormat::Int);
+    }
+
+    #[test]
+    fn wav_spec_from_config_fields() {
+        let cfg = cpal::SupportedStreamConfig::new(
+            1,
+            cpal::SampleRate(16_000),
+            cpal::SupportedBufferSize::Unknown,
+            cpal::SampleFormat::I16,
+        );
+        let spec = wav_spec_from_config(&cfg);
+        assert_eq!(spec.channels, 1);
+        assert_eq!(spec.sample_rate, 16_000);
+        assert_eq!(spec.bits_per_sample, 16);
+        assert_eq!(spec.sample_format, hound::SampleFormat::Int);
+    }
+
+    #[test]
+    fn write_and_read_wav() {
+        let tmp = NamedTempFile::new().unwrap();
+        let path = tmp.path().to_path_buf();
+        let spec = WavSpec {
+            channels: 1,
+            sample_rate: 8_000,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let samples = [0i16, 1, -1];
+        write_wav(path.to_str().unwrap(), &samples, spec).unwrap();
+
+        let mut r = WavReader::open(&path).unwrap();
+        let read_samples: Vec<i16> = r.samples().map(|s| s.unwrap()).collect();
+        assert_eq!(read_samples, samples);
     }
 }
