@@ -63,6 +63,15 @@ update_prompt = "..."
 
 Adjust these values or point `CONFIG_FILE` to another path when running the server.
 
+If the file is missing you can generate a template using the server binary:
+
+```bash
+cargo run --manifest-path server-rs/Cargo.toml -- gen-config openai > server-rs/config.toml
+```
+
+Supported providers are `openai` (default), `openrouter`, `azure`, `ollama` and `local`.
+Remember to set `OPENAI_API_KEY` when starting the server.
+
 ## Systemd Units
 
 Example service files are provided under [`contrib/systemd`](contrib/systemd):
