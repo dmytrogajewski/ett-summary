@@ -24,3 +24,62 @@ See [`server-rs`](server-rs/) for details about the Rust server and configuratio
    ```
 The server posts an updated summary after each upload and clears it after an hour of inactivity.
 
+## Building
+
+Build both binaries with `make`:
+
+```bash
+make build
+```
+
+The binaries are placed in the `bin/` directory. `build-server` and `build-client` targets are also available.
+
+## Running
+
+Run the server or client directly through `make`:
+
+```bash
+make run-server    # start the summarization server
+make run-client    # start the audio client using system-key "default"
+```
+
+## Configuration
+
+`server-rs/config.toml` contains default settings for the server:
+
+```toml
+openai_api_url = "https://api.openai.com/v1/chat/completions"
+openai_model = "gpt-3.5-turbo"
+webhook_url = "https://example.com/webhook"
+webhook_template = '{"summary":"{summary}"}'
+whisper_model_path = "models/ggml-base.en.bin"
+database_url = "postgres://user:password@localhost/summary"
+
+[[systems]]
+key = "default"
+initial_prompt = "..."
+update_prompt = "..."
+```
+
+Adjust these values or point `CONFIG_FILE` to another path when running the server.
+
+## Systemd Units
+
+Example service files are provided under [`contrib/systemd`](contrib/systemd):
+
+```bash
+sudo cp contrib/systemd/summary-server.service /etc/systemd/system/
+sudo cp contrib/systemd/summary-client.service /etc/systemd/system/
+```
+
+Enable and start the services with `systemctl enable --now summary-server summary-client`.
+
+## Docker
+
+`server-rs/Dockerfile` builds the server along with the default Whisper model. Build and run the image:
+
+```bash
+docker build -t summary-server ./server-rs
+docker run -p 8000:8000 -e OPENAI_API_KEY=your-key summary-server
+```
+

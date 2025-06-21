@@ -1,0 +1,12 @@
+[Unit]
+Description=ETT Summary Client
+After=sound.target network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ett-summary
+ExecStart=/opt/ett-summary/bin/client_app --system-key default
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
